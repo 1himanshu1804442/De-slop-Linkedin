@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8A2387;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#E94057;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F27121;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <!-- Background Card -->
+  <rect width="120" height="120" x="4" y="4" rx="28" fill="url(#grad)" />
+  
+  <!-- Sparkles / Magic Wand Graphic -->
+  <!-- Main Sparkle -->
+  <path d="M64,25 C64,45 83,45 83,64 C83,83 64,83 64,103 C64,83 45,83 45,64 C45,45 64,45 64,25 Z" fill="#FFFFFF" filter="url(#glow)" />
+  
+  <!-- Small Sparkle Top Right -->
+  <path d="M96,20 C96,30 105,30 105,40 C105,50 96,50 96,60 C96,50 87,50 87,40 C87,30 96,30 96,20 Z" fill="#FFE259" opacity="0.9" />
+  
+  <!-- Small Sparkle Bottom Left -->
+  <path d="M32,70 C32,78 39,78 39,86 C39,94 32,94 32,102 C32,94 25,94 25,86 C25,78 32,78 32,70 Z" fill="#FFE259" opacity="0.8" />
+</svg>

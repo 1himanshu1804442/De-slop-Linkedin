@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>De-Slop LinkedIn</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-area">
+        <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="24" height="24">
+          <defs>
+            <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#8A2387" />
+              <stop offset="50%" style="stop-color:#E94057" />
+              <stop offset="100%" style="stop-color:#F27121" />
+            </linearGradient>
+          </defs>
+          <rect width="128" height="128" rx="28" fill="url(#logo-grad)" />
+          <path d="M64,25 C64,45 83,45 83,64 C83,83 64,83 64,103 C64,83 45,83 45,64 C45,45 64,45 64,25 Z" fill="#FFFFFF" />
+        </svg>
+        <span class="logo-title">De-Slop <span class="accent-text">LinkedIn</span></span>
+      </div>
+      <button id="settings-btn" class="icon-btn" title="API Key Settings">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </header>
+
+    <!-- Sliding Settings Section -->
+    <section id="settings-panel" class="settings-panel hidden">
+      <div class="settings-content">
+        <h3>Gemini API Configuration</h3>
+        <p class="settings-help">An API key is required to connect to Gemini. It remains stored strictly in your browser.</p>
+        <div class="input-group">
+          <label for="api-key-input">Gemini API Key</label>
+          <div class="input-wrapper">
+            <input type="password" id="api-key-input" placeholder="Paste AI Studio Key here...">
+            <button id="toggle-key-visibility" class="text-btn">Show</button>
+          </div>
+        </div>
+        <div class="settings-actions">
+          <a href="https://aistudio.google.com/" target="_blank" class="link-btn">Get Free Key</a>
+          <button id="save-settings-btn" class="primary-btn btn-sm">Save Key</button>
+        </div>
+        <div id="settings-status" class="status-msg"></div>
+      </div>
+    </section>
+
+    <!-- Main Workspace -->
+    <main class="main-content">
+      <!-- Input Text -->
+      <div class="text-container">
+        <label for="input-text">Original Corporate Slop</label>
+        <textarea id="input-text" placeholder="I am incredibly thrilled and humbled to announce that we are pushing the boundaries of synergy..."></textarea>
+        <div class="textarea-actions">
+          <button id="clear-btn" class="text-btn">Clear</button>
+          <span id="char-count" class="char-count">0 chars</span>
+        </div>
+      </div>
+
+      <!-- Auto-Pilot Toggle -->
+      <div class="toggle-container">
+        <label class="toggle-label" for="autoPilotToggle">
+          <span class="toggle-text">Auto-Translate Feed (Warning: Uses API quickly)</span>
+          <span class="toggle-switch">
+            <input type="checkbox" id="autoPilotToggle">
+            <span class="toggle-slider"></span>
+          </span>
+        </label>
+      </div>
+
+      <!-- Personality Selector -->
+      <div class="selector-container">
+        <label>Select Translation Style</label>
+        <div class="style-grid">
+          <div class="style-card active" data-style="honesty">
+            <div class="card-glow"></div>
+            <div class="card-icon">🎯</div>
+            <div class="card-meta">
+              <span class="card-title">Brutal Honesty</span>
+              <span class="card-desc">Real truth, zero PR fluff</span>
+            </div>
+          </div>
+          
+          <div class="style-card" data-style="genz">
+            <div class="card-glow"></div>
+            <div class="card-icon">⚡</div>
+            <div class="card-meta">
+              <span class="card-title">Gen Z / Brainrot</span>
+              <span class="card-desc">No cap, maximum rizz</span>
+            </div>
+          </div>
+
+          <div class="style-card" data-style="shakespeare">
+            <div class="card-glow"></div>
+            <div class="card-icon">✍️</div>
+            <div class="card-meta">
+              <span class="card-title">Shakespearean</span>
+              <span class="card-desc">Thou art grandiloquent</span>
+            </div>
+          </div>
+
+          <div class="style-card" data-style="harrypotter">
+            <div class="card-glow"></div>
+            <div class="card-icon">🧙‍♂️</div>
+            <div class="card-meta">
+              <span class="card-title">Hogwarts Style</span>
+              <span class="card-desc">By Merlin's beard!</span>
+            </div>
+          </div>
+
+          <div class="style-card" data-style="pirate">
+            <div class="card-glow"></div>
+            <div class="card-icon">🏴‍☠️</div>
+            <div class="card-meta">
+              <span class="card-title">High-Seas Pirate</span>
+              <span class="card-desc">Ahoy, scallywags!</span>
+            </div>
+          </div>
+
+          <div class="style-card" data-style="yoda">
+            <div class="card-glow"></div>
+            <div class="card-icon">👽</div>
+            <div class="card-meta">
+              <span class="card-title">Yoda Style</span>
+              <span class="card-desc">Rewrite, we must</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <button id="transform-btn" class="glow-action-btn">
+        <span class="btn-text">De-Slop Text</span>
+        <span class="btn-stars">✨</span>
+      </button>
+
+      <!-- Output Text -->
+      <div id="output-container" class="text-container output-container hidden">
+        <label for="output-text">De-Slopped Version</label>
+        <textarea id="output-text" class="output-box" readonly placeholder="Your masterpiece will appear here..."></textarea>
+        <div class="textarea-actions">
+          <button id="copy-btn" class="primary-btn btn-sm">Copy Output</button>
+          <span id="copy-toast" class="toast-msg">Copied!</span>
+        </div>
+      </div>
+
+      <!-- Error Box -->
+      <div id="error-container" class="error-container hidden">
+        <span class="error-icon">⚠️</span>
+        <span id="error-message" class="error-message"></span>
+      </div>
+    </main>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
