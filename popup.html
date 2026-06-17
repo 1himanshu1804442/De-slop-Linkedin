@@ -27,12 +27,22 @@
         </svg>
         <span class="logo-title">De-Slop <span class="accent-text">LinkedIn</span></span>
       </div>
-      <button id="settings-btn" class="icon-btn" title="API Key Settings">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-      </button>
+      <div class="header-actions" style="display: flex; gap: 8px;">
+        <button id="personas-btn" class="icon-btn" title="Manage Custom Personas">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <line x1="19" y1="8" x2="19" y2="14"></line>
+            <line x1="16" y1="11" x2="22" y2="11"></line>
+          </svg>
+        </button>
+        <button id="settings-btn" class="icon-btn" title="API Key Settings">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
     </header>
 
     <!-- Sliding Settings Section -->
@@ -55,8 +65,52 @@
       </div>
     </section>
 
+    <!-- Sliding Personas Section -->
+    <section id="personas-panel" class="settings-panel hidden">
+      <div class="settings-content">
+        <h3>Custom Personas</h3>
+        <p class="settings-help">Create your own translation style by specifying a name, emoji, and prompt.</p>
+        
+        <div id="custom-personas-list" class="custom-personas-list">
+          <!-- Dynamically populated -->
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="input-group">
+          <label for="persona-name-input">Persona Name</label>
+          <input type="text" id="persona-name-input" placeholder="e.g. Anime Protagonist" class="custom-input">
+        </div>
+        
+        <div class="input-group">
+          <label for="persona-emoji-input">Emoji Icon</label>
+          <input type="text" id="persona-emoji-input" placeholder="e.g. 🦊" class="custom-input">
+        </div>
+
+        <div class="input-group">
+          <label for="persona-prompt-input">System Prompt</label>
+          <textarea id="persona-prompt-input" placeholder="e.g. Rewrite the text as if you are Naruto. Believe it!..." class="custom-textarea"></textarea>
+        </div>
+
+        <div class="settings-actions" style="justify-content: flex-end;">
+          <button id="save-persona-btn" class="primary-btn btn-sm">Save Persona</button>
+        </div>
+        <div id="personas-status" class="status-msg"></div>
+      </div>
+    </section>
+
     <!-- Main Workspace -->
     <main class="main-content">
+      
+      <!-- Onboarding / Status Card -->
+      <div id="status-card" class="status-card state-loading">
+        <div class="status-icon">🔄</div>
+        <div class="status-info">
+          <div class="status-title">Checking AI Capabilities...</div>
+          <div class="status-desc">Please wait</div>
+        </div>
+      </div>
+
       <!-- Input Text -->
       <div class="text-container">
         <label for="input-text">Original Corporate Slop</label>
@@ -81,60 +135,8 @@
       <!-- Personality Selector -->
       <div class="selector-container">
         <label>Select Translation Style</label>
-        <div class="style-grid">
-          <div class="style-card active" data-style="honesty">
-            <div class="card-glow"></div>
-            <div class="card-icon">🎯</div>
-            <div class="card-meta">
-              <span class="card-title">Brutal Honesty</span>
-              <span class="card-desc">Real truth, zero PR fluff</span>
-            </div>
-          </div>
-          
-          <div class="style-card" data-style="genz">
-            <div class="card-glow"></div>
-            <div class="card-icon">⚡</div>
-            <div class="card-meta">
-              <span class="card-title">Gen Z / Brainrot</span>
-              <span class="card-desc">No cap, maximum rizz</span>
-            </div>
-          </div>
-
-          <div class="style-card" data-style="shakespeare">
-            <div class="card-glow"></div>
-            <div class="card-icon">✍️</div>
-            <div class="card-meta">
-              <span class="card-title">Shakespearean</span>
-              <span class="card-desc">Thou art grandiloquent</span>
-            </div>
-          </div>
-
-          <div class="style-card" data-style="harrypotter">
-            <div class="card-glow"></div>
-            <div class="card-icon">🧙‍♂️</div>
-            <div class="card-meta">
-              <span class="card-title">Hogwarts Style</span>
-              <span class="card-desc">By Merlin's beard!</span>
-            </div>
-          </div>
-
-          <div class="style-card" data-style="pirate">
-            <div class="card-glow"></div>
-            <div class="card-icon">🏴‍☠️</div>
-            <div class="card-meta">
-              <span class="card-title">High-Seas Pirate</span>
-              <span class="card-desc">Ahoy, scallywags!</span>
-            </div>
-          </div>
-
-          <div class="style-card" data-style="yoda">
-            <div class="card-glow"></div>
-            <div class="card-icon">👽</div>
-            <div class="card-meta">
-              <span class="card-title">Yoda Style</span>
-              <span class="card-desc">Rewrite, we must</span>
-            </div>
-          </div>
+        <div class="style-grid" id="style-grid">
+          <!-- Dynamically populated from popup.js -->
         </div>
       </div>
 

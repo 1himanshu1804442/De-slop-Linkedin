@@ -3,15 +3,135 @@
 // Keep track of original text elements and their de-slopped counterparts
 const activeRewrites = new Map();
 
+let customPersonas = [];
+const DEFAULT_PERSONAS = [
+  { id: "honesty", name: "🎯 Brutal Honesty" },
+  { id: "genz", name: "⚡ Gen Z / Brainrot" },
+  { id: "shakespeare", name: "✍️ Shakespearean" },
+  { id: "harrypotter", name: "🧙‍♂️ Hogwarts Style" },
+  { id: "pirate", name: "🏴‍☠️ High-Seas Pirate" },
+  { id: "yoda", name: "👽 Yoda Style" },
+  { id: "anime", name: "🔥 Anime Protagonist" },
+  { id: "cyberpunk", name: "🦾 Cyberpunk Choom" }
+];
+
+function getStylesList() {
+  const customList = customPersonas.map(p => ({
+    id: p.id,
+    name: `${p.icon} ${p.name}`
+  }));
+  return [...DEFAULT_PERSONAS, ...customList];
+}
+
+// Queue system to handle API rate limiting
+const translationQueue = [];
+let isQueueProcessing = false;
+let queuePauseUntil = 0;
+let lastRequestStartTime = 0;
+
+async function processTranslationQueue() {
+  if (isQueueProcessing) return;
+  isQueueProcessing = true;
+
+  while (translationQueue.length > 0) {
+    if (Date.now() < queuePauseUntil) {
+      // If we are rate limited, clear the queue of stale automatic tasks
+      translationQueue.length = 0;
+      break;
+    }
+
+    const task = translationQueue.shift();
+
+    // Calculate delay needed to stay under 20 RPM (minimum 4.0 seconds start-to-start to be safe)
+    const minStartInterval = 4000;
+    const timeSinceLastStart = Date.now() - lastRequestStartTime;
+    const delayNeeded = Math.max(0, minStartInterval - timeSinceLastStart);
+
+    if (delayNeeded > 0) {
+      await new Promise(resolve => setTimeout(resolve, delayNeeded));
+    }
+
+    // Double check queuePauseUntil after the delay in case a manual request rate-limited us
+    if (Date.now() < queuePauseUntil) {
+      break;
+    }
+
+    lastRequestStartTime = Date.now();
+    await task.run();
+  }
+  
+  isQueueProcessing = false;
+}
+
+// Intersection Observer for scroll-debouncing
+const viewportObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    const { target, isIntersecting } = entry;
+    
+    if (isIntersecting) {
+      // Post is in view. Wait 800ms to see if user stops scrolling.
+      target._deslopTimer = setTimeout(() => {
+        chrome.storage.local.get(["autoPilotEnabled", "selectedPersona"], (result) => {
+          if (result.autoPilotEnabled) {
+            const persona = result.selectedPersona || "honesty";
+            
+            // Check if already processed or failed
+            const rewrite = activeRewrites.get(target);
+            const button = target._deslopButton; // Reference saved during injection
+            
+            if (!rewrite && !target._deslopFailed && button && !button.classList.contains("loading")) {
+              const isAlreadyQueued = translationQueue.some(t => t.element === target);
+              if (!isAlreadyQueued) {
+                translationQueue.push({
+                  element: target,
+                  run: async () => {
+                    return new Promise(resolve => {
+                      triggerFeedRewrite(target, target, persona, button, resolve);
+                    });
+                  }
+                });
+                processTranslationQueue();
+              }
+            }
+          }
+        });
+      }, 800);
+    } else {
+      // Post scrolled out of view
+      if (target._deslopTimer) {
+        clearTimeout(target._deslopTimer);
+        target._deslopTimer = null;
+      }
+      // Remove from translation queue if it hasn't started translating yet
+      const index = translationQueue.findIndex(t => t.element === target);
+      if (index !== -1) {
+        translationQueue.splice(index, 1);
+      }
+    }
+  });
+}, { threshold: 0.5 }); // 50% visibility required
+
+
 // Initialize the observers
 function init() {
   console.log("[De-Slop] LinkedIn content script loaded. Initializing...");
   
+  // Load personas
+  chrome.storage.local.get("customPersonas", (data) => {
+    customPersonas = data.customPersonas || [];
+  });
+  
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === "local" && changes.customPersonas) {
+      customPersonas = changes.customPersonas.newValue || [];
+    }
+  });
+
   // 1. Initial run to catch existing elements
   processFeedPosts();
   processEditors();
 
-  // 2. Set up MutationObserver to detect dynamically added feed posts and editors
+  // 2. Set up MutationObserver
   const observer = new MutationObserver((mutations) => {
     let shouldCheckPosts = false;
     let shouldCheckEditors = false;
@@ -19,8 +139,6 @@ function init() {
     for (const mutation of mutations) {
       if (mutation.addedNodes.length > 0) {
         shouldCheckPosts = true;
-        
-        // Check if any added node is or contains an editor
         for (const node of mutation.addedNodes) {
           if (node.nodeType === Node.ELEMENT_NODE) {
             if (node.querySelector('div[contenteditable="true"]') || node.getAttribute('contenteditable') === 'true') {
@@ -32,12 +150,8 @@ function init() {
       }
     }
 
-    if (shouldCheckPosts) {
-      processFeedPosts();
-    }
-    if (shouldCheckEditors) {
-      processEditors();
-    }
+    if (shouldCheckPosts) processFeedPosts();
+    if (shouldCheckEditors) processEditors();
   });
 
   observer.observe(document.body, {
@@ -58,22 +172,15 @@ function init() {
 // React-Safe ContentEditable Text replacement
 // -------------------------------------------------------------
 function setReactContentEditableText(element, text) {
-  console.log("[De-Slop] Attempting to set editor text:", text);
   element.focus();
-  
-  // Select all existing text
   const selection = window.getSelection();
   const range = document.createRange();
   range.selectNodeContents(element);
   selection.removeAllRanges();
   selection.addRange(range);
 
-  // Natively insert text so React's synthetic event listeners intercept it
   const success = document.execCommand('insertText', false, text);
-
-  // Fallback for Draft.js/Lexical if execCommand is blocked
   if (!success) {
-    console.log("[De-Slop] execCommand insertText failed, trying paste event fallback...");
     const dataTransfer = new DataTransfer();
     dataTransfer.setData('text/plain', text);
     const pasteEvent = new ClipboardEvent('paste', {
@@ -89,31 +196,19 @@ function setReactContentEditableText(element, text) {
 // Post Feed Processing
 // -------------------------------------------------------------
 function processFeedPosts() {
-  // Select structural containers that hold post text as requested
   const posts = document.querySelectorAll('span[data-testid="expandable-text-box"]:not([data-deslop-processed])');
-
-  if (posts.length > 0) {
-    console.log(`[De-Slop] Found ${posts.length} unprocessed posts`);
-  }
 
   posts.forEach(post => {
     post.setAttribute("data-deslop-processed", "true");
-    console.log("[De-Slop] Injecting button into post text container:", post);
     const button = injectDeSlopButton(post, post);
-
-    // Auto-Pilot Logic
-    chrome.storage.local.get(["autoPilotEnabled", "selectedPersona"], (result) => {
-      if (result.autoPilotEnabled) {
-        const persona = result.selectedPersona || "honesty";
-        console.log(`[De-Slop] Auto-Pilot active. Translating post in style: ${persona}`);
-        triggerFeedRewrite(post, post, persona, button);
-      }
-    });
+    post._deslopButton = button; // Store reference for the observer
+    
+    // Start tracking for auto-translate
+    viewportObserver.observe(post);
   });
 }
 
 function injectDeSlopButton(postElement, textContainer) {
-  // Create a shadow host container for our UI
   const host = document.createElement("div");
   host.className = "deslop-feed-widget";
   host.style.float = "right";
@@ -122,7 +217,6 @@ function injectDeSlopButton(postElement, textContainer) {
   host.style.position = "relative";
   host.style.zIndex = "5";
 
-  // Insert before textContainer as a sibling so hiding textContainer won't hide the button widget
   if (textContainer.parentNode) {
     textContainer.parentNode.insertBefore(host, textContainer);
   } else {
@@ -130,13 +224,10 @@ function injectDeSlopButton(postElement, textContainer) {
   }
 
   const shadow = host.attachShadow({ mode: "open" });
-  
-  // Create button inside shadow DOM
   const button = document.createElement("button");
   button.className = "deslop-btn";
   button.innerHTML = "De-Slop ✨";
   
-  // Style for the button & menu
   const style = document.createElement("style");
   style.textContent = `
     .deslop-btn {
@@ -159,9 +250,6 @@ function injectDeSlopButton(postElement, textContainer) {
     .deslop-btn:hover {
       transform: translateY(-1px);
       box-shadow: 0 4px 8px rgba(233, 64, 87, 0.4);
-    }
-    .deslop-btn:active {
-      transform: translateY(0);
     }
     .deslop-btn.active-rewrite {
       background: #242526;
@@ -189,9 +277,10 @@ function injectDeSlopButton(postElement, textContainer) {
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
       display: none;
       flex-direction: column;
-      width: 140px;
+      width: 160px;
+      max-height: 200px;
+      overflow-y: auto;
       z-index: 100;
-      overflow: hidden;
       font-family: system-ui, -apple-system, sans-serif;
     }
     .menu.show {
@@ -214,52 +303,42 @@ function injectDeSlopButton(postElement, textContainer) {
     }
   `;
 
-  // Create style selector menu
   const menu = document.createElement("div");
   menu.className = "menu";
   
-  const styles = [
-    { id: "honesty", name: "🎯 Brutal Honesty" },
-    { id: "genz", name: "⚡ Gen Z / Brainrot" },
-    { id: "shakespeare", name: "✍️ Shakespearean" },
-    { id: "harrypotter", name: "🧙‍♂️ Hogwarts Style" },
-    { id: "pirate", name: "🏴‍☠️ High-Seas Pirate" },
-    { id: "yoda", name: "👽 Yoda Style" }
-  ];
-
-  styles.forEach(item => {
-    const menuItem = document.createElement("button");
-    menuItem.className = "menu-item";
-    menuItem.textContent = item.name;
-    menuItem.addEventListener("click", (e) => {
-      e.stopPropagation();
-      menu.classList.remove("show");
-      triggerFeedRewrite(postElement, textContainer, item.id, button);
-    });
-    menu.appendChild(menuItem);
-  });
-
   // Toggle menu visibility
   button.addEventListener("click", (e) => {
     e.stopPropagation();
     
-    // If we've already rewritten it, clicking the button acts as a toggle back to original
     if (button.classList.contains("active-rewrite")) {
       restoreFeedPost(postElement, textContainer, button);
       return;
     }
 
-    // Close all other open De-slop menus
     document.querySelectorAll(".deslop-feed-widget").forEach(w => {
       if (w.shadowRoot) {
         w.shadowRoot.querySelector(".menu")?.classList.remove("show");
       }
     });
 
+    // Populate dynamic menu
+    menu.innerHTML = '';
+    const currentStyles = getStylesList();
+    currentStyles.forEach(item => {
+      const menuItem = document.createElement("button");
+      menuItem.className = "menu-item";
+      menuItem.textContent = item.name;
+      menuItem.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        menu.classList.remove("show");
+        triggerFeedRewrite(postElement, textContainer, item.id, button);
+      });
+      menu.appendChild(menuItem);
+    });
+
     menu.classList.toggle("show");
   });
 
-  // Close menu when clicking outside
   document.addEventListener("click", () => {
     menu.classList.remove("show");
   });
@@ -271,9 +350,12 @@ function injectDeSlopButton(postElement, textContainer) {
 }
 
 // Perform rewrite for feed post
-function triggerFeedRewrite(postElement, textContainer, style, button) {
+function triggerFeedRewrite(postElement, textContainer, style, button, onComplete) {
   const textToRewrite = textContainer.innerText.trim();
-  if (!textToRewrite) return;
+  if (!textToRewrite) {
+    if (onComplete) onComplete();
+    return;
+  }
 
   button.classList.add("loading");
   button.textContent = "Translating... ⚙️";
@@ -288,43 +370,62 @@ function triggerFeedRewrite(postElement, textContainer, style, button) {
       button.classList.remove("loading");
 
       if (response && response.success) {
-        // Find or create output container (slopContainer)
         let slopContainer = textContainer.parentNode.querySelector('.deslop-output-container');
         if (!slopContainer) {
           slopContainer = document.createElement('div');
           slopContainer.className = 'deslop-output-container';
-          
-          // --- NEW NATIVE STYLING ---
-          // Force the text to use LinkedIn's main text color variable, fallback to black
           slopContainer.style.color = 'var(--color-text, #000000)'; 
-          slopContainer.style.fontSize = '14px'; // Native LinkedIn font size
-          slopContainer.style.lineHeight = '1.42857'; // Native line height
+          slopContainer.style.fontSize = '14px';
+          slopContainer.style.lineHeight = '1.42857';
           slopContainer.style.marginTop = '8px';
-          slopContainer.style.whiteSpace = 'pre-wrap'; // Preserves line breaks nicely
-          
-          // Insert right after textContainer
+          slopContainer.style.whiteSpace = 'pre-wrap';
           textContainer.parentNode.insertBefore(slopContainer, textContainer.nextSibling);
         }
 
         slopContainer.innerText = response.text;
-        
-        // Hide the original, show the new
         textContainer.style.display = 'none';
         slopContainer.style.display = 'block';
 
-        // Save states for toggling
         activeRewrites.set(postElement, {
           originalEl: textContainer,
           rewrittenEl: slopContainer
         });
 
-        // Change button to toggle restore
         button.classList.add("active-rewrite");
         button.textContent = "Restore ↩️";
       } else {
-        alert("De-Slop Error: " + (response ? response.error : "Failed to communicate with background task. Make sure you set your API Key."));
-        button.textContent = "De-Slop ✨";
+        console.error("De-Slop Error:", response?.error);
+        
+        const errText = response?.error?.toLowerCase() || "";
+        const isRateLimit = errText.includes("quota") || 
+                            errText.includes("rate limit") || 
+                            errText.includes("exhausted") || 
+                            errText.includes("429") || 
+                            errText.includes("403") ||
+                            errText.includes("limit exceeded");
+
+        if (isRateLimit) {
+          button.textContent = "Rate Limit ⏳";
+          button.style.background = "#555";
+          
+          // Pause queue for 60 seconds and mark this post as failed so it isn't re-queued
+          queuePauseUntil = Date.now() + 60000;
+          postElement._deslopFailed = true;
+        } else {
+          button.textContent = "Error ❌";
+          button.style.background = "#8b0000";
+        }
+        
+        // Reset after 5 seconds so they can try again
+        setTimeout(() => {
+          if (!button.classList.contains("active-rewrite") && !button.classList.contains("loading")) {
+            button.textContent = "De-Slop ✨";
+            button.style.background = "";
+          }
+        }, 5000);
       }
+
+      if (onComplete) onComplete();
     }
   );
 }
@@ -332,15 +433,10 @@ function triggerFeedRewrite(postElement, textContainer, style, button) {
 function restoreFeedPost(postElement, textContainer, button) {
   const rewrite = activeRewrites.get(postElement);
   if (rewrite) {
-    // Remove the rewritten element
     rewrite.rewrittenEl.remove();
-    // Show original element again
     rewrite.originalEl.style.display = "";
-    
     activeRewrites.delete(postElement);
   }
-
-  // Restore button state
   button.classList.remove("active-rewrite");
   button.textContent = "De-Slop ✨";
 }
@@ -349,34 +445,25 @@ function restoreFeedPost(postElement, textContainer, button) {
 // Post Composer Editor Processing
 // -------------------------------------------------------------
 function processEditors() {
-  // Find any active contenteditable text editors based on robust structural selectors
   const editors = document.querySelectorAll(
     'div[role="textbox"][contenteditable="true"]:not([data-deslop-processed]), .ql-editor:not([data-deslop-processed])'
   );
 
-  if (editors.length > 0) {
-    console.log(`[De-Slop] Found ${editors.length} unprocessed editors`);
-  }
-
   editors.forEach(editor => {
     editor.setAttribute("data-deslop-processed", "true");
-    console.log("[De-Slop] Injecting widget into editor:", editor);
     injectEditorWidget(editor);
   });
 }
 
 function injectEditorWidget(editor) {
-  // Find the wrapper container of the editor so we can absolute position relative to it
   const wrapper = editor.parentElement;
   if (!wrapper) return;
 
-  // Make sure wrapper has a relative positioning so widget doesn't fly off
   const computedStyle = window.getComputedStyle(wrapper);
   if (computedStyle.position === "static") {
     wrapper.style.position = "relative";
   }
 
-  // Create shadow host container
   const host = document.createElement("div");
   host.className = "deslop-editor-widget";
   host.style.position = "absolute";
@@ -385,7 +472,6 @@ function injectEditorWidget(editor) {
   host.style.zIndex = "100";
 
   wrapper.appendChild(host);
-
   const shadow = host.attachShadow({ mode: "open" });
 
   const button = document.createElement("button");
@@ -415,9 +501,6 @@ function injectEditorWidget(editor) {
       transform: scale(1.1);
       box-shadow: 0 4px 10px rgba(233, 64, 87, 0.5);
     }
-    .editor-widget-btn:active {
-      transform: scale(1.0);
-    }
     .editor-widget-btn.loading {
       background: #444;
       animation: spin 1.5s linear infinite;
@@ -435,9 +518,10 @@ function injectEditorWidget(editor) {
       box-shadow: 0 4px 12px rgba(0,0,0,0.5);
       display: none;
       flex-direction: column;
-      width: 140px;
+      width: 160px;
+      max-height: 200px;
+      overflow-y: auto;
       z-index: 101;
-      overflow: hidden;
       font-family: system-ui, -apple-system, sans-serif;
     }
     .menu.show {
@@ -463,29 +547,24 @@ function injectEditorWidget(editor) {
   const menu = document.createElement("div");
   menu.className = "menu";
 
-  const styles = [
-    { id: "honesty", name: "🎯 Brutal Honesty" },
-    { id: "genz", name: "⚡ Gen Z / Brainrot" },
-    { id: "shakespeare", name: "✍️ Shakespearean" },
-    { id: "harrypotter", name: "🧙‍♂️ Hogwarts Style" },
-    { id: "pirate", name: "🏴‍☠️ High-Seas Pirate" },
-    { id: "yoda", name: "👽 Yoda Style" }
-  ];
-
-  styles.forEach(item => {
-    const menuItem = document.createElement("button");
-    menuItem.className = "menu-item";
-    menuItem.textContent = item.name;
-    menuItem.addEventListener("click", (e) => {
-      e.stopPropagation();
-      menu.classList.remove("show");
-      triggerEditorRewrite(editor, item.id, button);
-    });
-    menu.appendChild(menuItem);
-  });
-
   button.addEventListener("click", (e) => {
     e.stopPropagation();
+    
+    // Dynamically render menu
+    menu.innerHTML = '';
+    const currentStyles = getStylesList();
+    currentStyles.forEach(item => {
+      const menuItem = document.createElement("button");
+      menuItem.className = "menu-item";
+      menuItem.textContent = item.name;
+      menuItem.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        menu.classList.remove("show");
+        triggerEditorRewrite(editor, item.id, button);
+      });
+      menu.appendChild(menuItem);
+    });
+
     menu.classList.toggle("show");
   });
 
@@ -506,7 +585,7 @@ function triggerEditorRewrite(editorElement, style, button) {
   }
 
   button.classList.add("loading");
-  button.innerHTML = "⚙️"; // Loading gear icon
+  button.innerHTML = "⚙️"; 
 
   chrome.runtime.sendMessage(
     {
@@ -519,10 +598,9 @@ function triggerEditorRewrite(editorElement, style, button) {
       button.innerHTML = "✨";
 
       if (response && response.success) {
-        // Safely set text inside React contenteditable
         setReactContentEditableText(editorElement, response.text);
       } else {
-        alert("De-Slop Error: " + (response ? response.error : "Failed to communicate with background task. Make sure you set your API Key."));
+        alert("De-Slop Error: " + (response ? response.error : "Failed to communicate with background task."));
       }
     }
   );
@@ -532,7 +610,6 @@ function triggerEditorRewrite(editorElement, style, button) {
 // Global Selection Overlay (Right-Click Context Menu)
 // -------------------------------------------------------------
 function createGlobalOverlay(selectedText) {
-  // Remove existing overlay if present
   const existing = document.getElementById("deslop-global-overlay-host");
   if (existing) existing.remove();
 
@@ -660,7 +737,6 @@ function createGlobalOverlay(selectedText) {
   const card = document.createElement("div");
   card.className = "overlay-card";
 
-  // Header
   const header = document.createElement("div");
   header.className = "header";
   header.innerHTML = `
@@ -669,18 +745,15 @@ function createGlobalOverlay(selectedText) {
   `;
   card.appendChild(header);
 
-  // Close handler
   header.querySelector(".close-btn").addEventListener("click", () => {
     host.remove();
   });
 
-  // Original selection preview
   const originalPreview = document.createElement("div");
   originalPreview.className = "text-box";
   originalPreview.textContent = selectedText;
   card.appendChild(originalPreview);
 
-  // Select dropdown
   const selectLabel = document.createElement("div");
   selectLabel.className = "select-label";
   selectLabel.textContent = "Select Translation Style:";
@@ -688,15 +761,10 @@ function createGlobalOverlay(selectedText) {
 
   const select = document.createElement("select");
   select.className = "style-select";
-  const styles = [
-    { id: "honesty", name: "🎯 Brutal Honesty" },
-    { id: "genz", name: "⚡ Gen Z / Brainrot" },
-    { id: "shakespeare", name: "✍️ Shakespearean" },
-    { id: "harrypotter", name: "🧙‍♂️ Hogwarts Style" },
-    { id: "pirate", name: "🏴‍☠️ High-Seas Pirate" },
-    { id: "yoda", name: "👽 Yoda Style" }
-  ];
-  styles.forEach(item => {
+  
+  // Dynamic options
+  const currentStyles = getStylesList();
+  currentStyles.forEach(item => {
     const opt = document.createElement("option");
     opt.value = item.id;
     opt.textContent = item.name;
@@ -704,13 +772,11 @@ function createGlobalOverlay(selectedText) {
   });
   card.appendChild(select);
 
-  // Transform Button
   const btn = document.createElement("button");
   btn.className = "action-btn";
   btn.textContent = "Transform Selected Text";
   card.appendChild(btn);
 
-  // Output container
   const outputWrapper = document.createElement("div");
   outputWrapper.style.display = "none";
   outputWrapper.style.flexDirection = "column";
@@ -732,7 +798,6 @@ function createGlobalOverlay(selectedText) {
 
   card.appendChild(outputWrapper);
 
-  // Click Transform handler
   btn.addEventListener("click", () => {
     btn.classList.add("loading");
     btn.textContent = "Processing... ⚙️";
@@ -753,7 +818,6 @@ function createGlobalOverlay(selectedText) {
           outputWrapper.style.display = "flex";
           output.textContent = response.text;
           
-          // Copy listener
           copy.onclick = () => {
             navigator.clipboard.writeText(response.text).then(() => {
               copy.textContent = "Copied! ✓";
