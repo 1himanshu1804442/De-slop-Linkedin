@@ -1,5 +1,8 @@
 # De-Slop LinkedIn ✨
 
+<p align="center">
+  <img src="assets/banner.jpg" alt="De-Slop LinkedIn Before and After" width="100%">
+</p>
 Rescue your feed from boring corporate AI-slop! **De-Slop LinkedIn** is a lightweight, privacy-focused Manifest V3 Chrome Extension that rewrites generic, buzzword-heavy LinkedIn posts and editor drafts into fun, engaging personas (or brutal, direct honesty) using the Gemini 2.5 Flash API.
 
 ---
