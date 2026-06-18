@@ -374,7 +374,7 @@ function triggerFeedRewrite(postElement, textContainer, style, button, onComplet
         if (!slopContainer) {
           slopContainer = document.createElement('div');
           slopContainer.className = 'deslop-output-container';
-          slopContainer.style.color = 'var(--color-text, #000000)'; 
+          slopContainer.style.color = 'inherit'; 
           slopContainer.style.fontSize = '14px';
           slopContainer.style.lineHeight = '1.42857';
           slopContainer.style.marginTop = '8px';
